@@ -79,7 +79,7 @@ HWND WINAPI CreateWindowEx_hook(DWORD dwExStyle, LPCTSTR lpClassName, LPCTSTR lp
     }
 
     if (!strcmp((char*)lpClassName, "MapleStoryClass"))
-	{
+    {
         if (settings.windowed)
         {
             dwStyle = WS_OVERLAPPED | WS_MINIMIZEBOX | WS_MAXIMIZEBOX;
@@ -88,7 +88,7 @@ HWND WINAPI CreateWindowEx_hook(DWORD dwExStyle, LPCTSTR lpClassName, LPCTSTR lp
         window = CreateWindowEx_original(dwExStyle, lpClassName, (LPCTSTR)WINDOWNAME, dwStyle, x, y, nWidth, nHeight, hWndParent, hMenu, hInstance, lpParam);
 
         return window;
-	}
+    }
 
     return CreateWindowEx_original(dwExStyle, lpClassName, lpWindowName, dwStyle, x, y, nWidth, nHeight, hWndParent, hMenu, hInstance, lpParam);
 }
@@ -109,7 +109,6 @@ BOOL WINAPI SetWindowPos_hook(HWND hWnd, HWND hWndInsertAfter, int X, int Y, int
         }
         
         uFlags = SWP_DRAWFRAME | SWP_FRAMECHANGED | SWP_SHOWWINDOW;
-        // uFlags = SWP_DRAWFRAME | SWP_SHOWWINDOW;
         hWndInsertAfter = HWND_NOTOPMOST;
     }
     
@@ -137,8 +136,6 @@ HRESULT WINAPI CreateDevice_hook(IDirect3D8* Direct3D_Object, UINT Adapter, D3DD
 
         
         pPresentationParameters->BackBufferFormat = display_mode.Format;
-        // pPresentationParameters->BackBufferWidth = 1400;
-        // pPresentationParameters->BackBufferHeight = 700;
         pPresentationParameters->BackBufferWidth = 0;
         pPresentationParameters->BackBufferHeight = 0;
     }
@@ -243,7 +240,7 @@ BOOL hook()
     }
 
     IDirect3D8_vtable = (DWORD*)*(DWORD*)d3d_device;
-    d3d_device->GetAdapterDisplayMode(D3DADAPTER_DEFAULT,&display_mode);
+    d3d_device->GetAdapterDisplayMode(D3DADAPTER_DEFAULT, &display_mode);
     d3d_device->Release();
 
     DWORD protectFlag;
@@ -281,9 +278,9 @@ BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpReserved)
 
         freopen("CON", "w", stdout);
 
-        char cc[128];
-        sprintf_s(cc, "Attached to: %i", GetCurrentProcessId());
-        SetConsoleTitleA(cc);
+        char title[128];
+        sprintf_s(title, "Attached to: %i", GetCurrentProcessId());
+        SetConsoleTitleA(title);
     }
 
     DisableThreadLibraryCalls(hinstDLL);
