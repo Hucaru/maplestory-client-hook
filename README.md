@@ -8,6 +8,8 @@ Make sure visual studio is installed and edit the `VSTOOLS` variable in `build.b
 
 Download and install the DirectX SDK 2006 and make sure the `INCLUDE_DIR` and `LIB_DIR` variables in `build.bat` are pointing to your install.
 
+Download the Microsoft Detours repo and compile the x86 lib and copy the compiled lib and header file into this directory.
+
 Running `build.bat` should compile the DLL.
 
 ## How to inject
