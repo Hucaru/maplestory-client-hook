@@ -184,18 +184,20 @@ HRESULT WINAPI CreateDevice_hook(IDirect3D8* Direct3D_Object, UINT Adapter, D3DD
     DWORD protectFlag;
     if (VirtualProtect(&IDirect3D8_vtable[CREATEDEVICE_VTI], sizeof(DWORD), PAGE_READWRITE, &protectFlag))
 	{
-		*(DWORD*)&IDirect3D8_vtable[CREATEDEVICE_VTI] = (DWORD)CreateDevice_original;
+        *(DWORD*)&IDirect3D8_vtable[CREATEDEVICE_VTI] = (DWORD)CreateDevice_original;
 
-		if (!VirtualProtect(&IDirect3D8_vtable[CREATEDEVICE_VTI], sizeof(DWORD), protectFlag, &protectFlag))
-		{
+        if (!VirtualProtect(&IDirect3D8_vtable[CREATEDEVICE_VTI], sizeof(DWORD), protectFlag, &protectFlag))
+        {
             printf("VirtualProtect apply on CreateDevice vtable entry failed\n");
-			return D3DERR_INVALIDCALL;
-		}
+            return D3DERR_INVALIDCALL;
+        }
 
         printf("Reset CreateDevice vtable\n");
-	} else {
+	} 
+    else 
+    {
         printf("VirtualProtect remove on CreateDevice vtable entry failed\n");
-		return D3DERR_INVALIDCALL;
+        return D3DERR_INVALIDCALL;
 	}
 
     if (result == D3D_OK)
@@ -209,19 +211,19 @@ HRESULT WINAPI CreateDevice_hook(IDirect3D8* Direct3D_Object, UINT Adapter, D3DD
 
 BOOL apply_hook(__inout PVOID* ppvTarget, __in PVOID pvDetour)
 {
-	if (DetourTransactionBegin() != NO_ERROR)
+    if (DetourTransactionBegin() != NO_ERROR)
     {
         printf("Failed to being detour\n");
         return FALSE;
     }
 
-	if (DetourUpdateThread(GetCurrentThread()) != NO_ERROR)
+    if (DetourUpdateThread(GetCurrentThread()) != NO_ERROR)
     {
         printf("Detour thread update failed\n");
         return FALSE;
     }
 
-	if (DetourAttach(ppvTarget, pvDetour) != NO_ERROR)
+    if (DetourAttach(ppvTarget, pvDetour) != NO_ERROR)
     {
         printf("Failed detour attach\n");
         return FALSE;
@@ -296,12 +298,12 @@ BOOL hook()
     d3d_device->Release();
 
     DWORD protectFlag;
-	if (VirtualProtect(&IDirect3D8_vtable[CREATEDEVICE_VTI], sizeof(DWORD), PAGE_READWRITE, &protectFlag))
+    if (VirtualProtect(&IDirect3D8_vtable[CREATEDEVICE_VTI], sizeof(DWORD), PAGE_READWRITE, &protectFlag))
 	{
-		*(DWORD*)&CreateDevice_original = IDirect3D8_vtable[CREATEDEVICE_VTI];
-		*(DWORD*)&IDirect3D8_vtable[CREATEDEVICE_VTI] = (DWORD)CreateDevice_hook;
+        *(DWORD*)&CreateDevice_original = IDirect3D8_vtable[CREATEDEVICE_VTI];
+        *(DWORD*)&IDirect3D8_vtable[CREATEDEVICE_VTI] = (DWORD)CreateDevice_hook;
 
-		if (!VirtualProtect(&IDirect3D8_vtable[CREATEDEVICE_VTI], sizeof(DWORD), protectFlag, &protectFlag))
+        if (!VirtualProtect(&IDirect3D8_vtable[CREATEDEVICE_VTI], sizeof(DWORD), protectFlag, &protectFlag))
         {
             printf("VirtualProtect apply on CreateDevice vtable entry failed\n");
             return FALSE;
