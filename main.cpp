@@ -20,6 +20,7 @@ HWND window = NULL;
 struct config
 {
     BOOL debug_print;
+    BOOL multiclient;
     BOOL windowed;
     int width;
     int height;
@@ -28,7 +29,7 @@ struct config
 
 config settings = {};
 
-void parse_config()
+BOOL parse_config()
 {
     char path[MAX_PATH];
     GetModuleFileNameA(NULL, path, MAX_PATH);
@@ -38,6 +39,13 @@ void parse_config()
         if (path[i] == '\\')
         {
             ++i;
+
+            if (i + strlen(CONFIGNAME) >= MAX_PATH)
+            {
+                MessageBoxA(NULL, "You have placed your maplestory install in a folder path that is too long.", "Error", MB_OK | MB_ICONERROR);
+                return FALSE;
+            }
+
             for (int j = 0; j < strlen(CONFIGNAME); ++j)
             {
                 path[i + j] = CONFIGNAME[j];
@@ -49,22 +57,38 @@ void parse_config()
         }
     }
 
+    HANDLE hFile = CreateFile(path, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL | FILE_FLAG_OVERLAPPED, NULL);
+
+    if (hFile == INVALID_HANDLE_VALUE)
+    {
+        MessageBoxA(NULL, "Could not load settings file, please make sure it is named properly.", "Error", MB_OK | MB_ICONERROR);
+        return FALSE;
+    }
+
+    CloseHandle(hFile);
+
     settings.debug_print = GetPrivateProfileInt("Debug", "print", 0, path);
+    settings.multiclient = GetPrivateProfileInt("Debug", "multiclient", 0, path);
 
     settings.windowed = GetPrivateProfileInt("Display", "window_mode", 0, path);
     settings.width = GetPrivateProfileInt("Display", "resolution_x", 800, path);
     settings.height = GetPrivateProfileInt("Display", "resolution_y", 700, path);
     settings.screen_centre = GetPrivateProfileInt("Display", "screen_centre", 0, path);
+
+    return TRUE;
 }
 
 typedef HWND(WINAPI* create_window_ex_ptr)(DWORD dwExStyle, LPCTSTR lpClassName, LPCTSTR lpWindowName, DWORD dwStyle, int x, int y, int nWidth, int nHeight, HWND hWndParent, HMENU hMenu, HINSTANCE hInstance, LPVOID lpParam);
 create_window_ex_ptr CreateWindowEx_original;
 
+typedef BOOL (WINAPI* set_window_pos_ptr)(HWND hWnd, HWND hWndInsertAfter, int X, int Y, int cx, int cy, UINT uFlags);
+set_window_pos_ptr SetWindowPos_original;
+
 typedef LONG (WINAPI* set_window_long_a_ptr)(HWND hWnd, int nIndex, LONG dwNewLong);
 set_window_long_a_ptr SetWindowLongA_original;
 
-typedef BOOL (WINAPI* set_window_pos_ptr)(HWND hWnd, HWND hWndInsertAfter, int X, int Y, int cx, int cy, UINT uFlags);
-set_window_pos_ptr SetWindowPos_original;
+typedef HANDLE (WINAPI* create_mutex_a_ptr)(LPSECURITY_ATTRIBUTES lpMutexAttributes, BOOL bInitialOwner, LPCSTR lpName);
+create_mutex_a_ptr CreateMutexA_original;
 
 typedef HRESULT (WINAPI* CreateDevice_ptr)(IDirect3D8* Direct3D_Object, UINT Adapter, D3DDEVTYPE DeviceType, HWND hFocusWindow, DWORD BehaviorFlags, D3DPRESENT_PARAMETERS* pPresentationParameters, IDirect3DDevice8** ppReturnedDeviceInterface);
 CreateDevice_ptr CreateDevice_original;
@@ -80,14 +104,7 @@ HWND WINAPI CreateWindowEx_hook(DWORD dwExStyle, LPCTSTR lpClassName, LPCTSTR lp
 
     if (!strcmp((char*)lpClassName, "MapleStoryClass"))
     {
-        if (settings.windowed)
-        {
-            dwStyle = WS_OVERLAPPED | WS_MINIMIZEBOX | WS_MAXIMIZEBOX;
-        }
-
-        window = CreateWindowEx_original(dwExStyle, lpClassName, (LPCTSTR)WINDOWNAME, dwStyle, x, y, nWidth, nHeight, hWndParent, hMenu, hInstance, lpParam);
-
-        return window;
+        return CreateWindowEx_original(dwExStyle, lpClassName, (LPCTSTR)WINDOWNAME, dwStyle, x, y, nWidth, nHeight, hWndParent, hMenu, hInstance, lpParam);
     }
 
     return CreateWindowEx_original(dwExStyle, lpClassName, lpWindowName, dwStyle, x, y, nWidth, nHeight, hWndParent, hMenu, hInstance, lpParam);
@@ -95,10 +112,9 @@ HWND WINAPI CreateWindowEx_hook(DWORD dwExStyle, LPCTSTR lpClassName, LPCTSTR lp
 
 BOOL WINAPI SetWindowPos_hook(HWND hWnd, HWND hWndInsertAfter, int X, int Y, int cx, int cy, UINT uFlags)
 {
-    printf("SetWindowPos\n");
+    printf("SetWindowPos: %i %i %i %i %i\n", X, Y, cx, cy, uFlags);
     if (settings.windowed && hWnd == window)
     {
-
         cx = settings.width;
         cy = settings.height;
 
@@ -108,8 +124,20 @@ BOOL WINAPI SetWindowPos_hook(HWND hWnd, HWND hWndInsertAfter, int X, int Y, int
             Y = (GetSystemMetrics(SM_CYSCREEN) / 2) - (settings.height / 2);
         }
         
-        uFlags = SWP_DRAWFRAME | SWP_FRAMECHANGED | SWP_SHOWWINDOW;
+        uFlags = SWP_DRAWFRAME;
         hWndInsertAfter = HWND_NOTOPMOST;
+
+        RECT rect = {};
+        rect.left = X;
+        rect.right = X + cx;
+        rect.top = Y;
+        rect.bottom = Y + cy;
+
+        AdjustWindowRect(&rect, WS_OVERLAPPEDWINDOW, FALSE);
+        X = rect.left;
+        cx = rect.right - X;
+        Y = rect.top;
+        cy = rect.bottom - Y;
     }
     
     return SetWindowPos_original(hWnd, hWndInsertAfter, X, Y, cx, cy, uFlags);
@@ -120,10 +148,22 @@ LONG WINAPI SetWindowLongA_hook(HWND hWnd, int nIndex, LONG dwNewLong)
     printf("SetWindowLongA: %i, 0x%.8X\n", nIndex, dwNewLong);
     if (settings.windowed && hWnd == window)
     {
-        dwNewLong = WS_OVERLAPPED | WS_MINIMIZEBOX | WS_MAXIMIZEBOX;
+        dwNewLong =  WS_OVERLAPPEDWINDOW;
     }
     
     return SetWindowLongA_original(hWnd, nIndex, dwNewLong);;
+}
+
+HANDLE WINAPI CreateMutexA_hook(LPSECURITY_ATTRIBUTES lpMutexAttributes, BOOL bInitialOwner, LPCSTR lpName)
+{
+    printf("CreateMutexA: %s\n", lpName);
+
+    if (settings.multiclient)
+    {
+        lpName = NULL; // If this causes issues, only null the named mutex: WvsClientMtx
+    }
+    
+    return CreateMutexA_original(lpMutexAttributes, bInitialOwner, lpName);
 }
 
 HRESULT WINAPI CreateDevice_hook(IDirect3D8* Direct3D_Object, UINT Adapter, D3DDEVTYPE DeviceType, HWND hFocusWindow, DWORD BehaviorFlags, D3DPRESENT_PARAMETERS* pPresentationParameters, IDirect3DDevice8** ppReturnedDeviceInterface)
@@ -134,7 +174,6 @@ HRESULT WINAPI CreateDevice_hook(IDirect3D8* Direct3D_Object, UINT Adapter, D3DD
         pPresentationParameters->SwapEffect = D3DSWAPEFFECT::D3DSWAPEFFECT_DISCARD; // D3DSWAPEFFECT_FLIP for fullscreen
         pPresentationParameters->FullScreen_RefreshRateInHz = 0; // 60 for fullscreen
 
-        
         pPresentationParameters->BackBufferFormat = display_mode.Format;
         pPresentationParameters->BackBufferWidth = 0;
         pPresentationParameters->BackBufferHeight = 0;
@@ -149,18 +188,20 @@ HRESULT WINAPI CreateDevice_hook(IDirect3D8* Direct3D_Object, UINT Adapter, D3DD
 
 		if (!VirtualProtect(&IDirect3D8_vtable[CREATEDEVICE_VTI], sizeof(DWORD), protectFlag, &protectFlag))
 		{
+            printf("VirtualProtect apply on CreateDevice vtable entry failed\n");
 			return D3DERR_INVALIDCALL;
 		}
+
+        printf("Reset CreateDevice vtable\n");
 	} else {
+        printf("VirtualProtect remove on CreateDevice vtable entry failed\n");
 		return D3DERR_INVALIDCALL;
 	}
 
-    // clean up vtable
-
     if (result == D3D_OK)
     {
-        printf("d3d create ok\n");
-        // Here we can hook new vtable IDirect3D8_vtable = (DWORD*)*(DWORD*)*ppReturnedDeviceInterface; if we are interested in other methods
+        IDirect3D8_vtable = (DWORD*)*(DWORD*)*ppReturnedDeviceInterface;
+        // patch in functions of interest in vtable (endscene?), need to check if ms ever resets these pointers at any point and if so start thread to periodically patch
     }
 
     return result;
@@ -231,6 +272,17 @@ BOOL hook()
         printf("SetWindowPos hooked\n");
     }
 
+    CreateMutexA_original = &CreateMutexA;
+    if (!apply_hook((PVOID*)&CreateMutexA_original, (PVOID)CreateMutexA_hook))
+    {
+        printf("CreateMutexA hook failed\n");
+        return FALSE;
+    }
+    else
+    {
+        printf("CreateMutexA hooked\n");
+    }
+
     IDirect3D8* d3d_device = Direct3DCreate8(D3D_SDK_VERSION);
 
     if (!d3d_device)
@@ -251,7 +303,7 @@ BOOL hook()
 
 		if (!VirtualProtect(&IDirect3D8_vtable[CREATEDEVICE_VTI], sizeof(DWORD), protectFlag, &protectFlag))
         {
-            printf("VirtualProtect apply on CreateDevice vtable entry failed\n");    
+            printf("VirtualProtect apply on CreateDevice vtable entry failed\n");
             return FALSE;
         }
 
@@ -261,34 +313,35 @@ BOOL hook()
     {
         printf("VirtualProtect remove on CreateDevice vtable entry failed\n");
         return FALSE;
-    }
-    
+    }    
 
     return TRUE;
 }
 
 BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpReserved)
 {
-    parse_config();
-
-    if (settings.debug_print)
+    if (fdwReason == DLL_PROCESS_ATTACH)
     {
-        AllocConsole();
-        AttachConsole(GetCurrentProcessId());
+        if (!parse_config())
+        {
+            return FALSE;
+        }
 
-        freopen("CON", "w", stdout);
+        if (settings.debug_print)
+        {
+            AllocConsole();
+            AttachConsole(GetCurrentProcessId());
 
-        char title[128];
-        sprintf_s(title, "Attached to: %i", GetCurrentProcessId());
-        SetConsoleTitleA(title);
-    }
+            freopen("CON", "w", stdout);
 
-    DisableThreadLibraryCalls(hinstDLL);
+            char title[128];
+            sprintf_s(title, "Attached to: %i", GetCurrentProcessId());
+            SetConsoleTitleA(title);
+        }
 
-    switch (fdwReason)
-    {
-        case DLL_PROCESS_ATTACH:
-            return hook();
+        DisableThreadLibraryCalls(hinstDLL);
+
+        return hook();
     }
 
     return TRUE;

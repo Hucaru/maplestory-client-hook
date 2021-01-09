@@ -22,11 +22,12 @@ Make sure the ini file suplied is placed in the same folder as your MapleStory e
 
 ```
 [Debug]
-print = 1
+print = 1 ; console is created with debug statements
+multiclient = 1 ; allows multiple clients to be open at the same time
 
 [Display]
 window_mode = 1
 resolution_x = 800
 resolution_y = 600
-screen_centre = 1 ; Show the window in the centre of the screen
+screen_centre = 1 ; Show the window in the centre of the screen when created
 ```
