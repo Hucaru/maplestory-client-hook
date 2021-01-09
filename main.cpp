@@ -236,7 +236,7 @@ BOOL apply_hook(__inout PVOID* ppvTarget, __in PVOID pvDetour)
         return FALSE;
     }
     
-	return TRUE;
+    return TRUE;
 }
 
 BOOL hook()
