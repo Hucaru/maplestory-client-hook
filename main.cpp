@@ -183,7 +183,7 @@ HRESULT WINAPI CreateDevice_hook(IDirect3D8* Direct3D_Object, UINT Adapter, D3DD
 
     DWORD protectFlag;
     if (VirtualProtect(&IDirect3D8_vtable[CREATEDEVICE_VTI], sizeof(DWORD), PAGE_READWRITE, &protectFlag))
-	{
+    {
         *(DWORD*)&IDirect3D8_vtable[CREATEDEVICE_VTI] = (DWORD)CreateDevice_original;
 
         if (!VirtualProtect(&IDirect3D8_vtable[CREATEDEVICE_VTI], sizeof(DWORD), protectFlag, &protectFlag))
@@ -193,12 +193,12 @@ HRESULT WINAPI CreateDevice_hook(IDirect3D8* Direct3D_Object, UINT Adapter, D3DD
         }
 
         printf("Reset CreateDevice vtable\n");
-	} 
+    } 
     else 
     {
         printf("VirtualProtect remove on CreateDevice vtable entry failed\n");
         return D3DERR_INVALIDCALL;
-	}
+    }
 
     if (result == D3D_OK)
     {
@@ -299,7 +299,7 @@ BOOL hook()
 
     DWORD protectFlag;
     if (VirtualProtect(&IDirect3D8_vtable[CREATEDEVICE_VTI], sizeof(DWORD), PAGE_READWRITE, &protectFlag))
-	{
+    {
         *(DWORD*)&CreateDevice_original = IDirect3D8_vtable[CREATEDEVICE_VTI];
         *(DWORD*)&IDirect3D8_vtable[CREATEDEVICE_VTI] = (DWORD)CreateDevice_hook;
 
