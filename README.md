@@ -31,3 +31,7 @@ resolution_x = 800
 resolution_y = 600
 screen_centre = 1 ; Show the window in the centre of the screen when created
 ```
+
+## Screenshot
+
+![screenshot](screenshot.png)
