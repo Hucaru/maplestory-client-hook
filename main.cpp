@@ -90,8 +90,8 @@ set_window_long_a_ptr SetWindowLongA_original;
 typedef HANDLE (WINAPI* create_mutex_a_ptr)(LPSECURITY_ATTRIBUTES lpMutexAttributes, BOOL bInitialOwner, LPCSTR lpName);
 create_mutex_a_ptr CreateMutexA_original;
 
-typedef HRESULT (WINAPI* CreateDevice_ptr)(IDirect3D8* Direct3D_Object, UINT Adapter, D3DDEVTYPE DeviceType, HWND hFocusWindow, DWORD BehaviorFlags, D3DPRESENT_PARAMETERS* pPresentationParameters, IDirect3DDevice8** ppReturnedDeviceInterface);
-CreateDevice_ptr CreateDevice_original;
+typedef HRESULT (WINAPI* create_device_ptr)(IDirect3D8* Direct3D_Object, UINT Adapter, D3DDEVTYPE DeviceType, HWND hFocusWindow, DWORD BehaviorFlags, D3DPRESENT_PARAMETERS* pPresentationParameters, IDirect3DDevice8** ppReturnedDeviceInterface);
+create_device_ptr CreateDevice_original;
 
 HWND WINAPI CreateWindowEx_hook(DWORD dwExStyle, LPCTSTR lpClassName, LPCTSTR lpWindowName, DWORD dwStyle, int x, int y, int nWidth, int nHeight, HWND hWndParent, HMENU hMenu, HINSTANCE hInstance, LPVOID lpParam)
 {
@@ -104,7 +104,8 @@ HWND WINAPI CreateWindowEx_hook(DWORD dwExStyle, LPCTSTR lpClassName, LPCTSTR lp
 
     if (!strcmp((char*)lpClassName, "MapleStoryClass"))
     {
-        return CreateWindowEx_original(dwExStyle, lpClassName, (LPCTSTR)WINDOWNAME, dwStyle, x, y, nWidth, nHeight, hWndParent, hMenu, hInstance, lpParam);
+        window = CreateWindowEx_original(dwExStyle, lpClassName, (LPCTSTR)WINDOWNAME, dwStyle, x, y, nWidth, nHeight, hWndParent, hMenu, hInstance, lpParam);
+        return window;
     }
 
     return CreateWindowEx_original(dwExStyle, lpClassName, lpWindowName, dwStyle, x, y, nWidth, nHeight, hWndParent, hMenu, hInstance, lpParam);
@@ -184,7 +185,7 @@ HRESULT WINAPI CreateDevice_hook(IDirect3D8* Direct3D_Object, UINT Adapter, D3DD
     DWORD protectFlag;
     if (VirtualProtect(&IDirect3D8_vtable[CREATEDEVICE_VTI], sizeof(DWORD), PAGE_READWRITE, &protectFlag))
     {
-        *(DWORD*)&IDirect3D8_vtable[CREATEDEVICE_VTI] = (DWORD)CreateDevice_original;
+        IDirect3D8_vtable[CREATEDEVICE_VTI] = (DWORD)CreateDevice_original;
 
         if (!VirtualProtect(&IDirect3D8_vtable[CREATEDEVICE_VTI], sizeof(DWORD), protectFlag, &protectFlag))
         {
@@ -300,8 +301,8 @@ BOOL hook()
     DWORD protectFlag;
     if (VirtualProtect(&IDirect3D8_vtable[CREATEDEVICE_VTI], sizeof(DWORD), PAGE_READWRITE, &protectFlag))
     {
-        *(DWORD*)&CreateDevice_original = IDirect3D8_vtable[CREATEDEVICE_VTI];
-        *(DWORD*)&IDirect3D8_vtable[CREATEDEVICE_VTI] = (DWORD)CreateDevice_hook;
+        CreateDevice_original = (create_device_ptr)IDirect3D8_vtable[CREATEDEVICE_VTI];
+        IDirect3D8_vtable[CREATEDEVICE_VTI] = (DWORD)CreateDevice_hook;
 
         if (!VirtualProtect(&IDirect3D8_vtable[CREATEDEVICE_VTI], sizeof(DWORD), protectFlag, &protectFlag))
         {
