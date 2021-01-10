@@ -1,3 +1,4 @@
+#include <ws2spi.h>
 #include <windows.h>
 #include <stdio.h>
 #include <Include\d3d8.h> // Set the include path like this as it conflicts with windows 10 sdk unless using visual studio and manually adjusting include orders
@@ -78,7 +79,7 @@ BOOL parse_config()
     return TRUE;
 }
 
-typedef HWND(WINAPI* create_window_ex_ptr)(DWORD dwExStyle, LPCTSTR lpClassName, LPCTSTR lpWindowName, DWORD dwStyle, int x, int y, int nWidth, int nHeight, HWND hWndParent, HMENU hMenu, HINSTANCE hInstance, LPVOID lpParam);
+typedef HWND (WINAPI* create_window_ex_ptr)(DWORD dwExStyle, LPCTSTR lpClassName, LPCTSTR lpWindowName, DWORD dwStyle, int x, int y, int nWidth, int nHeight, HWND hWndParent, HMENU hMenu, HINSTANCE hInstance, LPVOID lpParam);
 create_window_ex_ptr CreateWindowEx_original;
 
 typedef BOOL (WINAPI* set_window_pos_ptr)(HWND hWnd, HWND hWndInsertAfter, int X, int Y, int cx, int cy, UINT uFlags);
@@ -89,6 +90,9 @@ set_window_long_a_ptr SetWindowLongA_original;
 
 typedef HANDLE (WINAPI* create_mutex_a_ptr)(LPSECURITY_ATTRIBUTES lpMutexAttributes, BOOL bInitialOwner, LPCSTR lpName);
 create_mutex_a_ptr CreateMutexA_original;
+
+typedef int (WINAPI* wsp_startup_ptr)(WORD wVersionRequested, LPWSPDATA lpWSPData, LPWSAPROTOCOL_INFOW lpProtocolInfo, WSPUPCALLTABLE UpcallTable, LPWSPPROC_TABLE lpProcTable);
+wsp_startup_ptr WSPStartup_original;
 
 typedef HRESULT (WINAPI* create_device_ptr)(IDirect3D8* Direct3D_Object, UINT Adapter, D3DDEVTYPE DeviceType, HWND hFocusWindow, DWORD BehaviorFlags, D3DPRESENT_PARAMETERS* pPresentationParameters, IDirect3DDevice8** ppReturnedDeviceInterface);
 create_device_ptr CreateDevice_original;
@@ -165,6 +169,19 @@ HANDLE WINAPI CreateMutexA_hook(LPSECURITY_ATTRIBUTES lpMutexAttributes, BOOL bI
     }
     
     return CreateMutexA_original(lpMutexAttributes, bInitialOwner, lpName);
+}
+
+int WINAPI WSPStartup_hook(WORD wVersionRequested, LPWSPDATA lpWSPData, LPWSAPROTOCOL_INFOW lpProtocolInfo, WSPUPCALLTABLE UpcallTable, LPWSPPROC_TABLE lpProcTable)
+{
+    printf("WSPStartup\n");
+    
+    // Detouring/Gateway the following functions should allow you to re-direct any client to any ip/domain (IPv4 only?)
+    // https://docs.microsoft.com/en-us/windows/win32/api/ws2spi/ns-ws2spi-wspproc_table
+
+    // lpProcTable->lpWSPConnect;
+    // lpProcTable->lpWSPGetPeerName;
+
+    return WSPStartup_original(wVersionRequested, lpWSPData, lpProtocolInfo, UpcallTable, lpProcTable);
 }
 
 HRESULT WINAPI CreateDevice_hook(IDirect3D8* Direct3D_Object, UINT Adapter, D3DDEVTYPE DeviceType, HWND hFocusWindow, DWORD BehaviorFlags, D3DPRESENT_PARAMETERS* pPresentationParameters, IDirect3DDevice8** ppReturnedDeviceInterface)
@@ -284,6 +301,34 @@ BOOL hook()
     else
     {
         printf("CreateMutexA hooked\n");
+    }
+
+    HMODULE module = LoadLibrary("MSWSOCK");
+
+    if (!module)
+    {
+        printf("Could not load MSWSOCK\n");
+        return FALSE;
+    }
+
+    DWORD address = (DWORD)GetProcAddress(module, "WSPStartup");
+
+    if (!address)
+    {
+        printf("Unable to find address of WSPStartup\n");
+        return FALSE;
+    }
+
+    wsp_startup_ptr _WSPStartup = (wsp_startup_ptr)address;
+    WSPStartup_original = _WSPStartup;
+    if (!apply_hook((PVOID*)&WSPStartup_original, (PVOID)WSPStartup_hook))
+    {
+        printf("WSPStartup hook failed\n");
+        return FALSE;
+    }
+    else
+    {
+        printf("WSPStartup hooked\n");
     }
 
     IDirect3D8* d3d_device = Direct3DCreate8(D3D_SDK_VERSION);
