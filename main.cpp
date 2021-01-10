@@ -319,8 +319,8 @@ BOOL hook()
         return FALSE;
     }
 
-    wsp_startup_ptr _WSPStartup = (wsp_startup_ptr)address;
-    WSPStartup_original = _WSPStartup;
+    wsp_startup_ptr WSPStartup = (wsp_startup_ptr)address;
+    WSPStartup_original = WSPStartup;
     if (!apply_hook((PVOID*)&WSPStartup_original, (PVOID)WSPStartup_hook))
     {
         printf("WSPStartup hook failed\n");
